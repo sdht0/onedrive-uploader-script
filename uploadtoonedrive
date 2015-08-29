@@ -1,0 +1,45 @@
+#!/bin/bash
+
+which onedrive-cli &>/dev/null || { echo "onedrive-cli needs to be installed. See README.md."; exit 1; }
+
+if [ $# -lt 2 ];then
+    echo "Usage: uploadtoonedrive local_file|local_folder /remotefolder [number_of_parallel_processes  [onedrive base options [onedrive put options [onedrive mkdir options]]]]"
+    exit 1
+fi
+
+localpath="$1"
+remotepath="$2"
+number_of_parallel_processes=10
+[[ -n "$3" ]] && number_of_parallel_processes="$3"
+clibaseoptions=($4)
+cliputoptions=($5)
+climkdiroptions=($6)
+
+pd=$(pwd)
+
+ctrl_c() {
+    echo "Exiting..."
+    cd "$pd"
+    exit 2
+}
+
+trap ctrl_c INT
+
+if [ -f "$localpath" ];then
+    echo "Uploading file '$localpath' to '$remotepath'"
+    onedrive-cli ${clibaseoptions[@]} put ${cliputoptions[@]} "$localpath" "$remotepath"
+elif [ -d "$localpath" ];then
+    rootfolder=$(basename "$localpath")
+    cd $(dirname "$localpath") &>/dev/null || { echo "Could not cd to base folder '$(dirname "$localpath")'. Stopping"; exit 1; }
+    echo "Creating directories:"
+    i=0
+    while true;do
+        [[ "$(find $rootfolder -maxdepth $i -mindepth $i -type d -print -quit | wc -l)" = "0" ]] && break;
+        find $rootfolder  -maxdepth $i -mindepth $i -type d | sed -r "s/^\.\///" | sed -e 's/"/\\\"/g' -e 's/'\''/\\\'\''/g' | sort | xargs -P$number_of_parallel_processes -L1 -I{} sh -c "echo "\""Creating folder '$remotepath/{}'"\""; onedrive-cli ${clibaseoptions[@]} mkdir ${climkdiroptions[@]} "\""$remotepath/{}"\"" 2>&1 | tail -n1"
+        i=$((i+1))
+    done
+    echo "Directories created. Uploading files:"
+    find $rootfolder -type f | sed -e 's/"/\\\"/g' -e 's/'\''/\\\'\''/g' | sort | xargs -P$number_of_parallel_processes -L1 -I{} sh -c "echo "\""Uploading file '$remotepath/\$(dirname "\""{}"\"")/\$(basename "\""{}"\"")'"\""; onedrive-cli ${clibaseoptions[@]} put ${cliputoptions[@]} "\""{}"\"" "\""$remotepath/\$(dirname "\""{}"\"")"\"
+else
+    echo "Needs file or directory"
+fi
