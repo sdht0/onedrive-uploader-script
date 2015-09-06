@@ -29,17 +29,17 @@ if [ -f "$localpath" ];then
     echo "Uploading file '$localpath' to '$remotepath'"
     onedrive-cli ${clibaseoptions[@]} put ${cliputoptions[@]} "$localpath" "$remotepath"
 elif [ -d "$localpath" ];then
-    rootfolder=$(basename "$localpath")
+    rootfolder="$(basename "$localpath")"
     cd $(dirname "$localpath") &>/dev/null || { echo "Could not cd to base folder '$(dirname "$localpath")'. Stopping"; exit 1; }
     echo "Creating directories:"
     i=0
     while true;do
-        [[ "$(find $rootfolder -maxdepth $i -mindepth $i -type d -print -quit | wc -l)" = "0" ]] && break;
-        find $rootfolder  -maxdepth $i -mindepth $i -type d | sed -r "s/^\.\///" | sed -e 's/"/\\\"/g' -e 's/'\''/\\\'\''/g' | sort | xargs -P$number_of_parallel_processes -L1 -I{} sh -c "echo "\""Creating folder '$remotepath/{}'"\""; onedrive-cli ${clibaseoptions[@]} mkdir ${climkdiroptions[@]} "\""$remotepath/{}"\"" 2>&1 | tail -n1"
+        [[ "$(find "$rootfolder" -maxdepth $i -mindepth $i -type d -print -quit | wc -l)" = "0" ]] && break;
+        find "$rootfolder"  -maxdepth $i -mindepth $i -type d | sed -r "s/^\.\///" | sed -e 's/"/\\\"/g' -e 's/'\''/\\\'\''/g' | sort | xargs -P$number_of_parallel_processes -L1 -I{} sh -c "echo "\""Creating folder '$remotepath/{}'"\""; onedrive-cli ${clibaseoptions[@]} mkdir ${climkdiroptions[@]} "\""$remotepath/{}"\"" 2>&1 | tail -n1"
         i=$((i+1))
     done
     echo "Directories created. Uploading files:"
-    find $rootfolder -type f | sed -e 's/"/\\\"/g' -e 's/'\''/\\\'\''/g' | sort | xargs -P$number_of_parallel_processes -L1 -I{} sh -c "echo "\""Uploading file '$remotepath/\$(dirname "\""{}"\"")/\$(basename "\""{}"\"")'"\""; onedrive-cli ${clibaseoptions[@]} put ${cliputoptions[@]} "\""{}"\"" "\""$remotepath/\$(dirname "\""{}"\"")"\"
+    find "$rootfolder" -type f | sed -e 's/"/\\\"/g' -e 's/'\''/\\\'\''/g' | sort | xargs -P$number_of_parallel_processes -L1 -I{} sh -c "echo "\""Uploading file '$remotepath/\$(dirname "\""{}"\"")/\$(basename "\""{}"\"")'"\""; onedrive-cli ${clibaseoptions[@]} put ${cliputoptions[@]} "\""{}"\"" "\""$remotepath/\$(dirname "\""{}"\"")"\"
 else
     echo "Needs file or directory"
 fi
